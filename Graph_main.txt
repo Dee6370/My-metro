@@ -1,0 +1,284 @@
+#include <iostream>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <queue>
+#include <limits>
+
+using namespace std;
+
+class Graph_M
+{
+public:
+    struct Vertex
+    {
+        unordered_map<string, int> nbrs;
+    };
+
+    unordered_map<string, Vertex> vtces;
+
+    int numVetex()
+    {
+        return vtces.size();
+    }
+
+    bool containsVertex(const string& vname)
+    {
+        return vtces.count(vname) > 0;
+    }
+
+    void addVertex(const string& vname)
+    {
+        Vertex vtx;
+        vtces[vname] = vtx;
+    }
+
+    void removeVertex(const string& vname)
+    {
+        Vertex vtx = vtces[vname];
+        vector<string> keys;
+
+        for (const auto& kvp : vtx.nbrs)
+        {
+            keys.push_back(kvp.first);
+        }
+
+        for (const string& key : keys)
+        {
+            Vertex nbrVtx = vtces[key];
+            nbrVtx.nbrs.erase(vname);
+        }
+
+        vtces.erase(vname);
+    }
+
+    int numEdges()
+    {
+        int count = 0;
+
+        for (const auto& kvp : vtces)
+        {
+            const Vertex& vtx = kvp.second;
+            count += vtx.nbrs.size();
+        }
+
+        return count / 2;
+    }
+
+    bool containsEdge(const string& vname1, const string& vname2)
+    {
+        if (!containsVertex(vname1) || !containsVertex(vname2))
+        {
+            return false;
+        }
+
+        const Vertex& vtx1 = vtces[vname1];
+        return vtx1.nbrs.count(vname2) > 0;
+    }
+
+    void addEdge(const string& vname1, const string& vname2, int value)
+    {
+        if (!containsVertex(vname1) || !containsVertex(vname2) || containsEdge(vname1, vname2))
+        {
+            return;
+        }
+
+        Vertex& vtx1 = vtces[vname1];
+        vtx1.nbrs[vname2] = value;
+
+        Vertex& vtx2 = vtces[vname2];
+        vtx2.nbrs[vname1] = value;
+    }
+
+    void removeEdge(const string& vname1, const string& vname2)
+    {
+        if (!containsVertex(vname1) || !containsVertex(vname2) || !containsEdge(vname1, vname2))
+        {
+            return;
+        }
+
+        Vertex& vtx1 = vtces[vname1];
+        vtx1.nbrs.erase(vname2);
+
+        Vertex& vtx2 = vtces[vname2];
+        vtx2.nbrs.erase(vname1);
+    }
+
+    void display_Map()
+    {
+        cout << "\t Delhi Metro Map" << endl;
+        cout << "\t------------------" << endl;
+        cout << "----------------------------------------------------" << endl << endl;
+
+        for (const auto& kvp : vtces)
+        {
+            const string& key = kvp.first;
+            const Vertex& vtx = kvp.second;
+            const unordered_map<string, int>& vtxnbrs = vtx.nbrs;
+
+            cout << key << " =>" << endl;
+            for (const auto& nbr : vtxnbrs)
+            {
+                cout << "\t" << nbr.first << "\t";
+                if (nbr.first.length() < 16)
+                    cout << "\t";
+                if (nbr.first.length() < 8)
+                    cout << "\t";
+                cout << nbr.second << endl;
+            }
+            cout << endl;
+        }
+
+        cout << "\t------------------" << endl;
+        cout << "---------------------------------------------------" << endl << endl;
+    }
+
+    void display_Stations()
+    {
+        cout << "\n***********************************************************************\n" << endl;
+
+        int i = 1;
+        for (const auto& kvp : vtces)
+        {
+            cout << i << ". " << kvp.first << endl;
+            i++;
+        }
+
+        cout << "\n***********************************************************************\n" << endl;
+    }
+
+    bool hasPath(const string& vname1, const string& vname2, unordered_map<string, bool>& processed)
+    {
+        if (containsEdge(vname1, vname2))
+        {
+            return true;
+        }
+
+        processed[vname1] = true;
+
+        const Vertex& vtx = vtces[vname1];
+        for (const auto& nbr : vtx.nbrs)
+        {
+            if (!processed.count(nbr.first) && hasPath(nbr.first, vname2, processed))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    struct DijkstraPair
+    {
+        string vname;
+        string psf;
+        int cost;
+
+        bool operator<(const DijkstraPair& other) const
+        {
+            return cost > other.cost;
+        }
+    };
+
+    int dijkstra(const string& src, const string& des, bool nan)
+    {
+        int val = 0;
+        vector<string> ans;
+        unordered_map<string, DijkstraPair> map;
+
+        priority_queue<DijkstraPair> heap;
+
+        for (const auto& kvp : vtces)
+        {
+            const string& key = kvp.first;
+            DijkstraPair np;
+            np.vname = key;
+            np.cost = numeric_limits<int>::max();
+
+            if (key == src)
+            {
+                np.cost = 0;
+                np.psf = key;
+            }
+
+            heap.push(np);
+            map[key] = np;
+        }
+
+        while (!heap.empty())
+        {
+            DijkstraPair rp = heap.top();
+            heap.pop();
+
+            if (rp.vname == des)
+            {
+                val = rp.cost;
+                break;
+            }
+
+            map.erase(rp.vname);
+            ans.push_back(rp.vname);
+
+            const Vertex& v = vtces[rp.vname];
+            for (const auto& nbr : v.nbrs)
+            {
+                if (map.count(nbr.first))
+                {
+                    int oc = map[nbr.first].cost;
+                    int nc;
+
+                    if (nan)
+                        nc = rp.cost + 120 + 40 * nbr.second;
+                    else
+                        nc = rp.cost + nbr.second;
+
+                    if (nc < oc)
+                    {
+                        DijkstraPair& gp = map[nbr.first];
+                        gp.psf = rp.psf + nbr.first;
+                        gp.cost = nc;
+
+                        heap.push(gp);
+                    }
+                }
+            }
+        }
+
+        return val;
+    }
+
+    struct Pair
+    {
+        string vname;
+        string psf;
+        int min_dis;
+        int min_time;
+    };
+
+    string Get_Minimum_Distance(const string& src, const string& dst)
+    {
+        int min = numeric_limits<int>::max();
+        string ans;
+        unordered_map<string, bool> processed;
+        queue<Pair> q;
+
+        Pair sp;
+        sp.vname = src;
+        sp.psf = src + "  ";
+        sp.min_dis = 0;
+        sp.min_time = 0;
+
+        q.push(sp);
+
+        while (!q.empty())
+        {
+            Pair rp = q.front();
+            q.pop();
+
+            if (processed.count(rp.vname))
+            {
+                continue;
+            }
+
+    }
+}
